@@ -22,7 +22,8 @@ Los campos obligatorios al crear un elemento serán:
 - marca del modelo real;
 - modelo real;
 - fabricante de la miniatura;
-- fecha de compra.
+- fecha de compra;
+- estado de compra: nuevo o segunda mano.
 
 El país se autorrellenará según estas reglas:
 
@@ -30,7 +31,7 @@ El país se autorrellenará según estas reglas:
 2. si no existe empresa de decoración, se usará el país de la marca del modelo real;
 3. el usuario podrá revisar o ajustar el país calculado si fuera necesario.
 
-El valor de compra será un dato relevante de visualización, especialmente en las tarjetas. El valor estimado actual existirá, pero se gestionará de forma manual con ayuda de referencias de mercado.
+El valor de compra será un dato relevante de visualización, especialmente en las tarjetas. El valor estimado actual existirá, pero se gestionará de forma manual con ayuda de referencias de mercado. Además, cada elemento deberá permitir registrar si fue vendido o no y, en caso afirmativo, el precio de venta. También se almacenará si la compra fue nueva o de segunda mano.
 
 ## 4. Vista de galería
 
@@ -41,7 +42,8 @@ La galería mostrará tarjetas visuales para navegar la colección. Cada tarjeta
 - modelo;
 - fabricante de la miniatura;
 - bandera del país calculado;
-- valor de compra.
+- valor de compra;
+- indicador visual de vendido, si aplica.
 
 La escala no se mostrará inicialmente en la tarjeta porque la colección será mayoritariamente 1:50, aunque sí estará disponible en la vista de detalle.
 
@@ -59,7 +61,10 @@ La vista de tabla estará orientada a consulta y gestión sin imágenes grandes.
 - país de la empresa de decoración;
 - escala;
 - fecha de compra;
+- estado de compra: nuevo o segunda mano;
 - valor de compra;
+- vendido;
+- precio de venta;
 - valor estimado actual;
 - estado;
 - referencia;
@@ -97,7 +102,21 @@ Las referencias de mercado podrán incluir:
 
 No se implementará scraping automático en la primera versión. Cualquier automatización futura deberá evaluarse según disponibilidad de APIs públicas, condiciones de uso de los sitios y calidad real de los datos.
 
-## 8. Catálogos y alta rápida
+## 8. Compra, venta y procedencia
+
+Cada elemento deberá permitir registrar su ciclo económico básico:
+
+- si fue comprado nuevo o de segunda mano;
+- si sigue en la colección o fue vendido;
+- precio de venta, si fue vendido;
+- moneda de venta;
+- fecha de venta opcional.
+
+El campo `isSold` indicará si el elemento fue vendido y deberá tener valor por defecto `false`. Si `isSold` es falso, los campos de venta deberán quedar vacíos. Si `isSold` es verdadero, el precio de venta y la moneda de venta deberán poder registrarse. La fecha de venta será opcional, pero recomendable.
+
+La tienda o vendedor donde se compró puede ser útil a futuro, pero no será obligatorio implementarlo en la primera versión. Para no bloquear esa ampliación, se reserva una entidad futura `Store`, que podrá asociarse más adelante a `Item` mediante un campo como `storeId` o mediante un historial de adquisiciones si se decide modelar compras de forma más avanzada.
+
+## 9. Catálogos y alta rápida
 
 La aplicación usará catálogos normalizados, pero con alta rápida desde los formularios. Si el usuario introduce una marca, fabricante, empresa de decoración, escala, estado o ubicación que no existe, la interfaz deberá permitir crearla sin abandonar el formulario del elemento.
 
@@ -109,25 +128,27 @@ Catálogos principales:
 - países;
 - escalas;
 - estados;
+- estados de compra;
 - monedas;
 - ubicaciones.
 
 Las tablas `Brand`, `Manufacturer` y `Company` tendrán `countryId` para poder calcular automáticamente el país del elemento.
 
-## 9. Uso de `sortOrder`
+## 10. Uso de `sortOrder`
 
 El campo `sortOrder` sirve para controlar el orden manual o semántico de registros cuando el orden alfabético no es suficiente.
 
 Ejemplos de uso:
 
 - en `Scale`, permite mostrar escalas en un orden lógico como 1:18, 1:24, 1:43, 1:50 y 1:64, en vez de depender solo del texto;
-- en `Condition`, permite mostrar estados en un orden definido como nuevo, muy bueno, bueno, usado o restaurado;
+- en `Condition`, permite mostrar estados de conservación en un orden definido como nuevo, muy bueno, bueno, usado o restaurado;
+- en `PurchaseCondition`, permite mostrar estados de compra en un orden definido como nuevo y segunda mano;
 - en `ItemImage`, permite ordenar las imágenes de un elemento para decidir qué imagen aparece primero, después de la portada;
 - en futuras listas configurables, permite que el usuario ajuste el orden de visualización.
 
 No es un campo obligatorio para todas las tablas. Solo debe añadirse cuando exista una necesidad real de ordenación manual o predecible.
 
-## 10. Modelo de base de datos propuesto
+## 11. Modelo de base de datos propuesto
 
 ### Entidades principales
 
@@ -160,6 +181,11 @@ Item
 - purchaseDate
 - purchaseValue
 - purchaseCurrencyId
+- purchaseConditionId
+- isSold
+- soldPrice
+- soldCurrencyId
+- soldDate
 - estimatedValue
 - estimatedValueCurrencyId
 - estimatedValueDate
@@ -217,6 +243,13 @@ Condition
 - createdAt
 - updatedAt
 
+PurchaseCondition
+- id
+- name
+- sortOrder
+- createdAt
+- updatedAt
+
 Currency
 - id
 - code
@@ -232,6 +265,24 @@ Location
 - createdAt
 - updatedAt
 ```
+
+
+### Entidad futura para tiendas o vendedores
+
+La entidad `Store` queda reservada para una fase posterior y no será parte obligatoria de la primera implementación. Cuando se implemente, podrá modelarse así:
+
+```text
+Store
+- id
+- name
+- website
+- countryId
+- notes
+- createdAt
+- updatedAt
+```
+
+En ese momento se decidirá si `Item` debe tener un `storeId` directo o si conviene crear un historial de adquisiciones más flexible.
 
 ### Imágenes
 
@@ -283,7 +334,7 @@ MarketReference
 - updatedAt
 ```
 
-## 11. Stack técnico recomendado
+## 12. Stack técnico recomendado
 
 Stack propuesto:
 
@@ -296,7 +347,7 @@ Stack propuesto:
 - Cloudflare R2 para imágenes;
 - autenticación desde la primera versión.
 
-## 12. Fases de desarrollo
+## 13. Fases de desarrollo
 
 ### Fase 1: base del proyecto
 
@@ -305,7 +356,7 @@ Stack propuesto:
 - Configurar Prisma y PostgreSQL.
 - Configurar autenticación inicial.
 - Crear modelos iniciales y migración base.
-- Crear seed inicial de países, monedas, escalas y estados.
+- Crear seed inicial de países, monedas, escalas, estados y estados de compra.
 
 ### Fase 2: catálogos
 
@@ -313,7 +364,7 @@ Stack propuesto:
 - CRUD de fabricantes.
 - CRUD de empresas de decoración.
 - CRUD de países.
-- CRUD de escalas, estados, monedas y ubicaciones.
+- CRUD de escalas, estados, estados de compra, monedas y ubicaciones.
 - Alta rápida desde el formulario de elemento.
 
 ### Fase 3: elementos de colección
@@ -324,6 +375,8 @@ Stack propuesto:
 - Eliminación con confirmación.
 - Autorrelleno de país según empresa de decoración o marca.
 - Validaciones de campos obligatorios.
+- Registro de compra nueva o de segunda mano.
+- Registro de venta mediante `isSold`, precio de venta, moneda y fecha de venta opcional.
 
 ### Fase 4: imágenes
 
@@ -351,6 +404,7 @@ Stack propuesto:
 
 ### Fase 7: mejoras futuras
 
+- Catálogo de tiendas o vendedores donde se compró cada miniatura, usando la entidad futura `Store`.
 - PWA.
 - Multiusuario completo.
 - Multicolección completa.
